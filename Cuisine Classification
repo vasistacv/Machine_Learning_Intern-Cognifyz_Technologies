@@ -1,0 +1,98 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+file_path = 'Dataset .csv'
+dataset = pd.read_csv(file_path)
+
+columns_to_keep = ["Restaurant Name", "Cuisines"]
+df = dataset[columns_to_keep]
+
+df["Cuisines"].fillna("Unknown", inplace=True)
+
+cuisine_counts = df["Cuisines"].value_counts()
+top_cuisines = cuisine_counts[cuisine_counts > 10].index  # Keep cuisines with more than 10 restaurants
+df = df[df["Cuisines"].isin(top_cuisines)]
+
+vectorizer = CountVectorizer(stop_words="english")
+X = vectorizer.fit_transform(df["Restaurant Name"])
+
+y = df["Cuisines"]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
+
+clf = RandomForestClassifier(random_state=42, n_estimators=100)
+clf.fit(X_train, y_train)
+
+y_pred = clf.predict(X_test)
+
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("\nClassification Report:\n", classification_report(y_test, y_pred))
+
+plt.figure(figsize=(12, 8))
+conf_matrix = confusion_matrix(y_test, y_pred, labels=top_cuisines)
+sns.heatmap(
+    conf_matrix,
+    annot=True,
+    fmt="d",
+    xticklabels=top_cuisines,
+    yticklabels=top_cuisines,
+    cmap="Blues"
+)
+plt.title("Confusion Matrix for Cuisine Classification", fontsize=14)
+plt.xlabel("Predicted Label", fontsize=12)
+plt.ylabel("True Label", fontsize=12)
+plt.show()
+
+plt.figure(figsize=(10, 6))
+sns.countplot(y=df["Cuisines"], order=top_cuisines, palette="viridis", edgecolor="black")
+plt.title("Distribution of Top Cuisines in Dataset", fontsize=14)
+plt.xlabel("Count", fontsize=12)
+plt.ylabel("Cuisines", fontsize=12)
+plt.grid(axis="x", linestyle="--", alpha=0.6)
+plt.show()
+
+report = classification_report(y_test, y_pred, output_dict=True)
+cuisines = list(report.keys())[:-3]  # Exclude average metrics
+
+precision = [report[cuisine]["precision"] for cuisine in cuisines]
+recall = [report[cuisine]["recall"] for cuisine in cuisines]
+
+performance_df = pd.DataFrame({
+    "Cuisine": cuisines,
+    "Precision": precision,
+    "Recall": recall
+}).sort_values(by="Precision", ascending=False)
+plt.figure(figsize=(12, 6))
+performance_df.plot(
+    x="Cuisine",
+    kind="bar",
+    stacked=True,
+    color=["#2c7bb6", "#d7191c"],
+    figsize=(12, 8)
+)
+plt.title("Precision and Recall for Each Cuisine", fontsize=14)
+plt.xlabel("Cuisine", fontsize=12)
+plt.ylabel("Score", fontsize=12)
+plt.legend(loc="upper right")
+plt.grid(axis="y", linestyle="--", alpha=0.6)
+plt.xticks(rotation=45)
+plt.show()
+
+feature_importances = clf.feature_importances_
+top_features = np.argsort(feature_importances)[-10:][::-1]  # Top 10 features
+important_words = np.array(vectorizer.get_feature_names_out())[top_features]
+important_scores = feature_importances[top_features]
+
+plt.figure(figsize=(10, 6))
+sns.barplot(x=important_scores, y=important_words, palette="coolwarm", edgecolor="black")
+plt.title("Top 10 Most Important Features for Classification", fontsize=14)
+plt.xlabel("Importance Score", fontsize=12)
+plt.ylabel("Features (Words)", fontsize=12)
+plt.grid(axis="x", linestyle="--", alpha=0.6)
+plt.show()
