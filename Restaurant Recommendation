@@ -1,0 +1,97 @@
+import pandas as pd
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+file_path = 'Dataset .csv'
+dataset = pd.read_csv(file_path)
+
+columns_to_keep = ["Restaurant Name", "Cuisines", "Price range", "Aggregate rating", "Votes"]
+df = dataset[columns_to_keep]
+
+columns_to_keep = ["Restaurant Name", "Cuisines", "Price range", "Aggregate rating", "Votes"]
+df = dataset[columns_to_keep]
+
+df["Cuisines"].fillna("Unknown", inplace=True)
+
+df["Combined"] = df["Cuisines"] + " " + df["Price range"].astype(str)
+
+tfidf = TfidfVectorizer(stop_words="english")
+tfidf_matrix = tfidf.fit_transform(df["Combined"])
+
+cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
+
+def recommend_restaurants(preferred_cuisine, price_range, top_n=5):
+    # Combine user preferences
+    user_query = preferred_cuisine + " " + str(price_range)
+
+    # Vectorize the user query
+    user_vec = tfidf.transform([user_query])
+
+    # Compute similarity scores
+    similarity_scores = cosine_similarity(user_vec, tfidf_matrix).flatten()
+
+    # Add similarity scores to the DataFrame
+    df["Similarity"] = similarity_scores
+
+    # Rank restaurants by similarity, rating, and votes
+    recommendations = (
+        df.sort_values(by=["Similarity", "Aggregate rating", "Votes"], ascending=[False, False, False])
+        .head(top_n)
+    )
+    return recommendations[["Restaurant Name", "Cuisines", "Price range", "Aggregate rating", "Votes", "Similarity"]]
+
+user_cuisine = "Japanese"
+user_price_range = 3
+
+recommendations = recommend_restaurants(user_cuisine, user_price_range, top_n=5)
+
+print("Top recommendations for user preferences:")
+print(recommendations)
+
+plt.figure(figsize=(10, 6))
+sns.barplot(
+    x="Aggregate rating",
+    y="Restaurant Name",
+    data=recommendations,
+    palette="viridis",
+    edgecolor="black"
+)
+plt.title("Top Restaurant Recommendations (Aggregate Ratings)", fontsize=14)
+plt.xlabel("Aggregate Rating", fontsize=12)
+plt.ylabel("Restaurant Name", fontsize=12)
+plt.grid(axis="x", linestyle="--", alpha=0.6)
+plt.show()
+
+similarity_matrix = cosine_sim[:10, :10]  # Show similarity of top 10 restaurants
+plt.figure(figsize=(12, 8))
+sns.heatmap(
+    similarity_matrix,
+    cmap="coolwarm",
+    annot=True,
+    xticklabels=False,
+    yticklabels=False
+)
+plt.title("Heatmap of Similarity Scores (Top 10 Restaurants)", fontsize=14)
+plt.xlabel("Restaurants", fontsize=12)
+plt.ylabel("Restaurants", fontsize=12)
+plt.show()
+
+plt.figure(figsize=(10, 6))
+sns.scatterplot(
+    x="Aggregate rating",
+    y="Votes",
+    size="Votes",
+    hue="Restaurant Name",
+    data=recommendations,
+    sizes=(50, 300),
+    legend=False,
+    palette="deep"
+)
+plt.title("Votes vs. Ratings for Recommendations", fontsize=14)
+plt.xlabel("Aggregate Rating", fontsize=12)
+plt.ylabel("Votes", fontsize=12)
+plt.grid(alpha=0.4)
+plt.show()
