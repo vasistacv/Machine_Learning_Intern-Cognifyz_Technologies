@@ -1,0 +1,75 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import folium
+from folium.plugins import MarkerCluster
+
+file_path = 'Dataset .csv'  # Replace with the correct file path
+dataset = pd.read_csv(file_path)
+
+print("Dataset Overview:")
+print(dataset.info())
+
+print("Generating geographical map...")
+base_map = folium.Map(location=[dataset['Latitude'].mean(), dataset['Longitude'].mean()], zoom_start=10)
+marker_cluster = MarkerCluster().add_to(base_map)
+
+for _, row in dataset.iterrows():
+    folium.Marker(
+        location=[row['Latitude'], row['Longitude']],
+        popup=f"{row['Restaurant Name']}<br>Rating: {row['Aggregate rating']}<br>{row['Cuisines']}",
+        tooltip=row['Restaurant Name']
+    ).add_to(marker_cluster)
+
+base_map.save("restaurant_map.html")
+print("Map saved as 'restaurant_map.html'.")
+
+city_group = dataset['City'].value_counts().head(10)
+plt.figure(figsize=(12, 7))
+sns.barplot(x=city_group.values, y=city_group.index, palette="coolwarm")
+plt.title("Top 10 Cities by Number of Restaurants", fontsize=18, weight='bold')
+plt.xlabel("Number of Restaurants", fontsize=14)
+plt.ylabel("City", fontsize=14)
+plt.grid(axis='x', linestyle='--', alpha=0.6)
+plt.tight_layout()
+plt.savefig("top_cities_by_restaurants.png")
+plt.show()
+
+city_stats = dataset.groupby('City').agg({
+    'Aggregate rating': 'mean',
+    'Average Cost for two': 'mean',
+}).sort_values(by='Aggregate rating', ascending=False).head(10)
+
+plt.figure(figsize=(12, 7))
+sns.barplot(data=city_stats, x=city_stats['Aggregate rating'], y=city_stats.index, palette="viridis")
+plt.title("Top 10 Cities by Average Rating", fontsize=18, weight='bold')
+plt.xlabel("Average Rating", fontsize=14)
+plt.ylabel("City", fontsize=14)
+plt.grid(axis='x', linestyle='--', alpha=0.6)
+plt.tight_layout()
+plt.savefig("top_cities_by_ratings.png")
+plt.show()
+
+cuisine_data = dataset['Cuisines'].dropna().str.split(', ', expand=True).stack()
+cuisine_counts = cuisine_data.value_counts().head(10)
+
+plt.figure(figsize=(12, 7))
+sns.barplot(x=cuisine_counts.values, y=cuisine_counts.index, palette="magma")
+plt.title("Top 10 Most Popular Cuisines", fontsize=18, weight='bold')
+plt.xlabel("Number of Restaurants Offering", fontsize=14)
+plt.ylabel("Cuisine", fontsize=14)
+plt.grid(axis='x', linestyle='--', alpha=0.6)
+plt.tight_layout()
+plt.savefig("top_cuisines.png")
+plt.show()
+
+price_stats = dataset.groupby('City')['Average Cost for two'].mean().sort_values(ascending=False).head(10)
+plt.figure(figsize=(12, 7))
+sns.barplot(x=price_stats.values, y=price_stats.index, palette="cubehelix")
+plt.title("Top 10 Cities by Average Cost for Two", fontsize=18, weight='bold')
+plt.xlabel("Average Cost for Two", fontsize=14)
+plt.ylabel("City", fontsize=14)
+plt.grid(axis='x', linestyle='--', alpha=0.6)
+plt.tight_layout()
+plt.savefig("top_cities_by_cost.png")
+plt.show()
