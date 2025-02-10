@@ -1,0 +1,110 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+%matplotlib inline
+
+data = pd.read_csv('Dataset .csv')
+
+print("Dataset Head:\n", data.head())
+
+print("\nAvailable Columns in the Dataset:", data.columns)
+
+if 'Price_Range' in data.columns:
+    data['Price_Range'].fillna(data['Price_Range'].median(), inplace=True)
+
+if 'Number_of_Reviews' in data.columns:
+    data['Number_of_Reviews'].fillna(data['Number_of_Reviews'].mean(), inplace=True)
+
+if 'Cuisine_Type' in data.columns:
+    data['Cuisine_Type'].fillna('Unknown', inplace=True)
+
+print("\nMissing values after handling:\n", data.isnull().sum())
+
+print("Available columns in the dataset:", data.columns)
+
+
+possible_targets = ['Rating', 'Aggregate_Rating', 'Ratings', 'AggregateRating', 'rating', 'aggregate_rating']
+target_column = None
+
+
+for col in possible_targets:
+    if col in data.columns:
+        target_column = col
+        break
+
+
+if target_column is None:
+    print("\nNo suitable target column (e.g., 'Rating', 'Aggregate_Rating') found in the dataset! Proceeding with the analysis using available data.")
+    target_column = data.columns[0]
+
+print(f"\nTarget column found: {target_column}")
+
+
+X = data.drop(target_column, axis=1)
+y = data[target_column]
+
+categorical_features = [col for col in data.columns if data[col].dtype == 'object' and col != target_column]
+numerical_features = [col for col in data.columns if data[col].dtype in ['int64', 'float64'] and col != target_column]
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', StandardScaler(), numerical_features),
+        ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features)
+    ])
+
+X = preprocessor.fit_transform(X)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+model = RandomForestRegressor(random_state=42)
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+r2 = r2_score(y_test, y_pred)
+
+print("\nModel Evaluation Metrics:")
+print(f"Mean Squared Error (MSE): {mse}")
+print(f"Root Mean Squared Error (RMSE): {rmse}")
+print(f"R-squared (R²): {r2}")
+
+if hasattr(model, 'feature_importances_'):
+    feature_names = numerical_features + list(preprocessor.transformers_[1][1].get_feature_names_out(categorical_features))
+    feature_importances = pd.Series(model.feature_importances_, index=feature_names).sort_values(ascending=False)
+
+    print("\nFeature Importances:")
+    print(feature_importances)
+
+
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x=feature_importances.values, y=feature_importances.index)
+    plt.title("Feature Importances")
+    plt.xlabel("Importance Score")
+    plt.ylabel("Features")
+    plt.show()
+
+plt.figure(figsize=(8, 6))
+sns.scatterplot(x=y_test, y=y_pred, alpha=0.7)
+plt.title("Actual Ratings vs Predicted Ratings")
+plt.xlabel("Actual Ratings")
+plt.ylabel("Predicted Ratings")
+plt.show()
+
+
+numeric_data = data.select_dtypes(include=[np.number])
+correlations = numeric_data.corr()
+
+
+plt.figure(figsize=(8, 6))
+sns.heatmap(correlations, annot=True, cmap='coolwarm', fmt=".2f")
+plt.title("Correlation Matrix")
+plt.show()
